@@ -1,0 +1,28 @@
+{
+  "fusion_no_calendar": {
+    "file": "fusion_no_calendar.pt",
+    "contents": "trained tensors only; ResNet-50 below layer4 is frozen at ImageNet init and loaded from torchvision",
+    "fit_on": "train split (n=955)",
+    "best_epoch": 3,
+    "modality_dropout": 0.2,
+    "excluded_feature": "visit_start_datetime",
+    "seed": 42
+  },
+  "calibrator": {
+    "file": "calibrator_isotonic.json",
+    "applies_to": "fusion_no_calendar.pt only",
+    "note": "fitted on val predictions from this exact model; do not apply to a model trained on different rows"
+  },
+  "clinical_lightgbm": {
+    "files": [
+      "clinical_lightgbm_naive.txt",
+      "clinical_lightgbm_calendar_ablated.txt"
+    ],
+    "fit_on": "train split (n=955)"
+  },
+  "preprocessing": {
+    "impute_stats_final.json": "train medians/modes, calendar column dropped",
+    "encoder_state.json": "fitted ClinicalEncoder: vocabularies, log1p selection, standardization"
+  },
+  "contains_patient_data": false
+}

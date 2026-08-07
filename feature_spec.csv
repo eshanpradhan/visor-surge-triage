@@ -1,0 +1,132 @@
+column_name,category,status,reason,redundant_with
+to_patient_id,admin,DROP,"Patient identifier. Join key only, never a feature.",
+covid19_statuses,admin,DROP,Constant: 'positive' for all 1384 rows. Zero variance.,
+last.status,outcome,LEAK,Discharge disposition (discharged/deceased). Secondary reporting metric only.,
+age.splits,demographics,SAFE,"Age band: [18,59], (59,74], (74,90]. Known at presentation.",
+gender_concept_name,demographics,SAFE,MALE 760 / FEMALE 592 / null 32. Known at presentation.,
+visit_start_datetime,admin,SAFE,"Admission date, known at presentation. Date-shifted for de-identification; spans Dec-1900 to Sep-1901. Carries a calendar-wave confound because COVID treatment protocols changed over 2020 -- use with caution or bin coarsely.",
+visit_concept_name,admin,LEAK_RISK,"Inpatient 1025 / ER 357 / Outpatient 2. Encodes the admission decision, which a clinician makes in reaction to observed severity.",
+is_icu,outcome,LEAK,Component of the severe label. Training on it is circular.,
+was_ventilated,outcome,LEAK,Component of the severe label. Training on it is circular.,
+invasive_vent_days,outcome,LEAK,Computed from the ventilation event. NaN corresponds exactly to was_ventilated=='No'.,
+length_of_stay,outcome,LEAK,"Whole-stay quantity, unknown until discharge.",
+Acute.Hepatic.Injury..during.hospitalization.,in_hospital,LEAK,Column name states the observation window is the hospitalization.,
+Acute.Kidney.Injury..during.hospitalization.,in_hospital,LEAK,Column name states the observation window is the hospitalization.,
+Urine.protein,lab_binned,SAFE,"Normal/Abnormal, 60.3% null. No numeric counterpart in this file.",
+kidney_replacement_therapy,in_hospital,LEAK,In-hospital dialysis (70 Yes). A treatment given in response to deterioration.,
+kidney_transplant,comorbidity,DROP,"98.4% null, only 22 Yes. Too sparse to estimate anything from.",
+htn_v,comorbidity,SAFE,"Baseline hypertension history, known before admission.",
+dm_v,comorbidity,SAFE,"Baseline diabetes mellitus history, known before admission.",
+cad_v,comorbidity,SAFE,"Baseline coronary artery disease history, known before admission.",
+hf_ef_v,comorbidity,SAFE,Heart failure phenotype: No / HFpEF / HFrEF. Baseline history.,
+ckd_v,comorbidity,SAFE,"Baseline chronic kidney disease history, known before admission.",
+malignancies_v,comorbidity,SAFE,"Baseline malignancy history, known before admission.",
+copd_v,comorbidity,SAFE,"Baseline COPD history, known before admission.",
+other_lung_disease_v,comorbidity,SAFE,"Baseline other chronic lung disease history, known before admission.",
+acei_v,comorbidity,SAFE,"Baseline home ACE inhibitor history, known before admission.",
+arb_v,comorbidity,SAFE,"Baseline home ARB history, known before admission.",
+antibiotics_use_v,comorbidity,DROP,"Ambiguous timing, unresolved without data dictionary -- excluded conservatively. The _v suffix suggests baseline/home use, but if this records in-hospital administration it is a response to severity. Promote to SAFE only after the TCIA documentation confirms it is a pre-admission value.",
+nsaid_use_v,comorbidity,DROP,"Ambiguous timing, unresolved without data dictionary -- excluded conservatively. Same concern as antibiotics_use_v.",
+days_prior_sx,symptom,SAFE,Days of symptoms before presentation. Reported at admission.,
+smoking_status_v,comorbidity,SAFE,Never 764 / Former 250 / Current 36. Baseline history.,
+cough_v,symptom,SAFE,Cough reported at presentation.,
+dyspnea_admission_v,symptom,SAFE,Dyspnea recorded at admission.,
+nausea_v,symptom,SAFE,Nausea reported at presentation.,
+vomiting_v,symptom,SAFE,Vomiting reported at presentation.,
+diarrhea_v,symptom,SAFE,Diarrhea reported at presentation.,
+abdominal_pain_v,symptom,SAFE,Abdominal pain reported at presentation.,
+fever_v,symptom,SAFE,Fever reported at presentation.,
+BMI.over30,lab_binned,SAFE,"Threshold flag derived from '39156-5_Body mass index (BMI) [Ratio]'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",39156-5_Body mass index (BMI) [Ratio]
+BMI.over35,lab_binned,SAFE,"Threshold flag derived from '39156-5_Body mass index (BMI) [Ratio]'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",39156-5_Body mass index (BMI) [Ratio]
+temperature.over38,lab_binned,SAFE,"Threshold flag derived from '8331-1_Oral temperature'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",8331-1_Oral temperature
+pulseOx.under90,lab_binned,SAFE,"Threshold flag derived from '59408-5_Oxygen saturation in Arterial blood by Pulse oximetry'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",59408-5_Oxygen saturation in Arterial blood by Pulse oximetry
+Respiration.over24,lab_binned,SAFE,"Threshold flag derived from '9279-1_Respiratory rate'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",9279-1_Respiratory rate
+HeartRate.over100,lab_binned,SAFE,"Threshold flag derived from '76282-3_Heart rate.beat-to-beat by EKG'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",76282-3_Heart rate.beat-to-beat by EKG
+Lymphocytes.under1k,lab_binned,SAFE,"Threshold flag derived from '731-0_Lymphocytes [#/volume] in Blood by Automated count'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",731-0_Lymphocytes [#/volume] in Blood by Automated count
+Aspartate.over40,lab_binned,SAFE,"Threshold flag derived from '1920-8_Aspartate aminotransferase'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",1920-8_Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma
+Alanine.over60,lab_binned,SAFE,"Threshold flag derived from '1744-2_Alanine aminotransferase'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",1744-2_Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma by No addition of P-5'-P
+A1C.over6.5,lab_binned,SAFE,"Threshold flag derived from '4548-4_Hemoglobin A1c/Hemoglobin.total in Blood'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",4548-4_Hemoglobin A1c/Hemoglobin.total in Blood
+A1C.under6.5,lab_binned,SAFE,"Threshold flag derived from '4548-4_Hemoglobin A1c/Hemoglobin.total in Blood'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",4548-4_Hemoglobin A1c/Hemoglobin.total in Blood
+A1C.6.6to7.9,lab_binned,SAFE,"Threshold flag derived from '4548-4_Hemoglobin A1c/Hemoglobin.total in Blood'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",4548-4_Hemoglobin A1c/Hemoglobin.total in Blood
+A1C.8to9.9,lab_binned,SAFE,"Threshold flag derived from '4548-4_Hemoglobin A1c/Hemoglobin.total in Blood'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",4548-4_Hemoglobin A1c/Hemoglobin.total in Blood
+A1C.over10,lab_binned,SAFE,"Threshold flag derived from '4548-4_Hemoglobin A1c/Hemoglobin.total in Blood'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",4548-4_Hemoglobin A1c/Hemoglobin.total in Blood
+Sodium.above145,lab_binned,SAFE,"Threshold flag derived from '2951-2_Sodium [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2951-2_Sodium [Moles/volume] in Serum or Plasma
+Sodium.between135and145,lab_binned,SAFE,"Threshold flag derived from '2951-2_Sodium [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2951-2_Sodium [Moles/volume] in Serum or Plasma
+Sodium.below135,lab_binned,SAFE,"Threshold flag derived from '2951-2_Sodium [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2951-2_Sodium [Moles/volume] in Serum or Plasma
+Potassium.above5.2,lab_binned,SAFE,"Threshold flag derived from '2823-3_Potassium [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2823-3_Potassium [Moles/volume] in Serum or Plasma
+Potassium.between3.5and5.2,lab_binned,SAFE,"Threshold flag derived from '2823-3_Potassium [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2823-3_Potassium [Moles/volume] in Serum or Plasma
+Potassium.below3.5,lab_binned,SAFE,"Threshold flag derived from '2823-3_Potassium [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2823-3_Potassium [Moles/volume] in Serum or Plasma
+Chloride.above107,lab_binned,SAFE,"Threshold flag derived from '2075-0_Chloride [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2075-0_Chloride [Moles/volume] in Serum or Plasma
+Chloride.between96and107,lab_binned,SAFE,"Threshold flag derived from '2075-0_Chloride [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2075-0_Chloride [Moles/volume] in Serum or Plasma
+Chloride.below96,lab_binned,SAFE,"Threshold flag derived from '2075-0_Chloride [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2075-0_Chloride [Moles/volume] in Serum or Plasma
+Bicarbonate.above31,lab_binned,SAFE,"Threshold flag derived from '1963-8_Bicarbonate [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",1963-8_Bicarbonate [Moles/volume] in Serum or Plasma
+Bicarbonate.between21and31,lab_binned,SAFE,"Threshold flag derived from '1963-8_Bicarbonate [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",1963-8_Bicarbonate [Moles/volume] in Serum or Plasma
+Bicarbonate.below21,lab_binned,SAFE,"Threshold flag derived from '1963-8_Bicarbonate [Moles/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",1963-8_Bicarbonate [Moles/volume] in Serum or Plasma
+Blood_Urea_Nitrogen.above20,lab_binned,SAFE,"Threshold flag derived from '3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma
+Blood_Urea_Nitrogen.between5and20,lab_binned,SAFE,"Threshold flag derived from '3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma
+Blood_Urea_Nitrogen.below5,lab_binned,SAFE,"Threshold flag derived from '3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma
+Creatinine.above1.2,lab_binned,SAFE,"Threshold flag derived from '2160-0_Creatinine [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2160-0_Creatinine [Mass/volume] in Serum or Plasma
+Creatinine.between0.5and1.2,lab_binned,SAFE,"Threshold flag derived from '2160-0_Creatinine [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2160-0_Creatinine [Mass/volume] in Serum or Plasma
+Creatinine.below0.5,lab_binned,SAFE,"Threshold flag derived from '2160-0_Creatinine [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2160-0_Creatinine [Mass/volume] in Serum or Plasma
+eGFR.above60,lab_binned,SAFE,"Threshold flag derived from '62238-1_Glomerular filtration rate'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.","62238-1_Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (CKD-EPI)"
+eGFR.between30and60,lab_binned,SAFE,"Threshold flag derived from '62238-1_Glomerular filtration rate'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.","62238-1_Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (CKD-EPI)"
+eGFR.below30,lab_binned,SAFE,"Threshold flag derived from '62238-1_Glomerular filtration rate'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.","62238-1_Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (CKD-EPI)"
+blood_pH.above7.45,lab_binned,DROP,"Threshold flag of a DROP column (33254-4 arterial pH, >75% missing pre-impute). Dropped with its source rather than allowed back in as a non-redundant column.",
+blood_pH.between7.35and7.45,lab_binned,DROP,"Threshold flag of a DROP column (33254-4 arterial pH, >75% missing pre-impute). Dropped with its source rather than allowed back in as a non-redundant column.",
+blood_pH.below7.35,lab_binned,DROP,"Threshold flag of a DROP column (33254-4 arterial pH, >75% missing pre-impute). Dropped with its source rather than allowed back in as a non-redundant column.",
+Troponin.above0.01,lab_binned,SAFE,"Threshold flag derived from '6598-7_Troponin T.cardiac'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",6598-7_Troponin T.cardiac [Mass/volume] in Serum or Plasma
+D_dimer.above3000,lab_binned,SAFE,"Threshold flag derived from '48058-2_Fibrin D-dimer DDU'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",48058-2_Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma by Immunoassay
+D_dimer.between500and3000,lab_binned,SAFE,"Threshold flag derived from '48058-2_Fibrin D-dimer DDU'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",48058-2_Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma by Immunoassay
+D_dimer.below500,lab_binned,SAFE,"Threshold flag derived from '48058-2_Fibrin D-dimer DDU'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",48058-2_Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma by Immunoassay
+ESR.above30,lab_binned,SAFE,"Threshold flag derived from '30341-2_Erythrocyte sedimentation rate'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",30341-2_Erythrocyte sedimentation rate
+Microscopic_hematuria.above2,lab_binned,SAFE,Threshold flag with no numeric counterpart in this file.,
+SBP.below120,lab_binned,SAFE,"Threshold flag derived from '8480-6_Systolic blood pressure'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",8480-6_Systolic blood pressure
+SBP.between120and139,lab_binned,SAFE,"Threshold flag derived from '8480-6_Systolic blood pressure'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",8480-6_Systolic blood pressure
+SBP.above139,lab_binned,SAFE,"Threshold flag derived from '8480-6_Systolic blood pressure'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",8480-6_Systolic blood pressure
+MAP.below65,lab_binned,SAFE,"Threshold flag derived from '76536-2_Mean blood pressure by Noninvasive'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",76536-2_Mean blood pressure by Noninvasive
+MAP.between65and90,lab_binned,SAFE,"Threshold flag derived from '76536-2_Mean blood pressure by Noninvasive'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",76536-2_Mean blood pressure by Noninvasive
+MAP.above90,lab_binned,SAFE,"Threshold flag derived from '76536-2_Mean blood pressure by Noninvasive'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",76536-2_Mean blood pressure by Noninvasive
+procalcitonin.below0.25,lab_binned,SAFE,"Threshold flag derived from '75241-0_Procalcitonin'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",75241-0_Procalcitonin [Mass/volume] in Serum or Plasma by Immunoassay
+procalcitonin.between0.25and0.5,lab_binned,SAFE,"Threshold flag derived from '75241-0_Procalcitonin'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",75241-0_Procalcitonin [Mass/volume] in Serum or Plasma by Immunoassay
+procalcitonin.above0.5,lab_binned,SAFE,"Threshold flag derived from '75241-0_Procalcitonin'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",75241-0_Procalcitonin [Mass/volume] in Serum or Plasma by Immunoassay
+ferritin.above1k,lab_binned,SAFE,"Threshold flag derived from '2276-4_Ferritin [Mass/volume] in Serum or Plasma'. Timing-safe but redundant with that numeric column -- pick one representation, do not model both.",2276-4_Ferritin [Mass/volume] in Serum or Plasma
+Proteinuria.above80,lab_binned,DROP,"Post-imputation near-constant, >75% missing pre-impute (84.5%).",
+8331-1_Oral temperature,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+59408-5_Oxygen saturation in Arterial blood by Pulse oximetry,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+9279-1_Respiratory rate,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+76282-3_Heart rate.beat-to-beat by EKG,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+8480-6_Systolic blood pressure,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+76536-2_Mean blood pressure by Noninvasive,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+33256-9_Leukocytes [#/volume] corrected for nucleated erythrocytes in Blood by Automated count,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+751-8_Neutrophils [#/volume] in Blood by Automated count,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+731-0_Lymphocytes [#/volume] in Blood by Automated count,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2951-2_Sodium [Moles/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+1920-8_Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+1744-2_Alanine aminotransferase [Enzymatic activity/volume] in Serum or Plasma by No addition of P-5'-P,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2157-6_Creatine kinase [Enzymatic activity/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2524-7_Lactate [Moles/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+6598-7_Troponin T.cardiac [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+33762-6_Natriuretic peptide.B prohormone N-Terminal [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+75241-0_Procalcitonin [Mass/volume] in Serum or Plasma by Immunoassay,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+48058-2_Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma by Immunoassay,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2276-4_Ferritin [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+1988-5_C reactive protein [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+4548-4_Hemoglobin A1c/Hemoglobin.total in Blood,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+39156-5_Body mass index (BMI) [Ratio],lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2951-2_Sodium [Moles/volume] in Serum or Plasma.1,lab_numeric,DROP,Byte-identical duplicate of '2951-2_Sodium [Moles/volume] in Serum or Plasma' (verified with Series.equals). The .1 suffix is a pandas rename of a repeated header.,
+2823-3_Potassium [Moles/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2075-0_Chloride [Moles/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+1963-8_Bicarbonate [Moles/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+3094-0_Urea nitrogen [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2160-0_Creatinine [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+"62238-1_Glomerular filtration rate/1.73 sq M.predicted [Volume Rate/Area] in Serum, Plasma or Blood by Creatinine-based formula (CKD-EPI)",lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+33254-4_pH of Arterial blood adjusted to patient's actual temperature,lab_numeric,DROP,"Post-imputation near-constant, >75% missing pre-impute (83.5%). Arterial blood gas is ordered selectively, so the missingness is also informative in the wrong direction.",
+30341-2_Erythrocyte sedimentation rate,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+2345-7_Glucose [Mass/volume] in Serum or Plasma,lab_numeric,SAFE,LOINC-coded vital or laboratory value at presentation.,
+13457-7_Cholesterol in LDL [Mass/volume] in Serum or Plasma by calculation,lab_numeric,DROP,"Post-imputation near-constant, >75% missing pre-impute (78.2%).",
+13458-5_Cholesterol in VLDL [Mass/volume] in Serum or Plasma by calculation,lab_numeric,DROP,"Post-imputation near-constant, >75% missing pre-impute (78.2%).",
+2571-8_Triglyceride [Mass/volume] in Serum or Plasma,lab_numeric,DROP,"Post-imputation near-constant, >75% missing pre-impute (77.2%).",
+2085-9_Cholesterol in HDL [Mass/volume] in Serum or Plasma,lab_numeric,DROP,"Post-imputation near-constant, >75% missing pre-impute (78.0%).",
+therapeutic.exnox.Boolean,in_hospital,LEAK,Therapeutic enoxaparin started during the stay in response to clinical course.,
+therapeutic.heparin.Boolean,in_hospital,LEAK,Therapeutic heparin started during the stay in response to clinical course.,
+Other.anticoagulation.therapy,in_hospital,LEAK,"In-hospital anticoagulation agent (8 levels, 'not documented' for 1155).",

@@ -1,0 +1,75 @@
+# =============================================================================
+# Patient data and derived per-patient files.
+#
+# The rule: nothing with one row per patient gets committed. The source clinical
+# CSV, the derived label/cohort/manifest tables, and the saved prediction and
+# embedding arrays all carry a de-identified patient identifier joined to an
+# outcome (ICU / ventilation / death). Aggregate outputs -- per-fold metrics,
+# column-level specifications, fitted summary statistics -- are safe and are
+# committed so results are readable without rerunning anything.
+#
+# Everything ignored here regenerates by running the pipeline in the order
+# documented in README.md.
+# =============================================================================
+
+# --- imaging archive (2.1 GB, 13,638 files; redownload from Kaggle) ----------
+COVID-19-NY-SBU/
+covid-19-cxr-ny-sbu.zip
+*.kaggle-partial
+
+# --- source clinical data (1384 patient rows with outcomes) ------------------
+deidentified_overlap_tcia.csv*
+patient_details.csv
+metadata.csv
+MIDRC-RICORD-*.xlsx
+midrc-ricord-*.zip
+
+# --- derived per-patient tables ----------------------------------------------
+visor_labels.csv
+visor_cohort.csv
+visor_manifest.csv
+visor_manifest_split.csv
+
+# --- saved arrays: all of these are one row per patient ----------------------
+# resnet50_embeddings*.npz hold p_* (patient IDs) and y_* (labels) alongside the
+# 2048-d features. test_preds_*.npz hold y_true plus per-patient predictions in
+# split order, which reconstructs the test outcome vector. Both are row-level
+# patient outcome data despite looking like intermediate model artifacts.
+*.npz
+
+# --- credentials --------------------------------------------------------------
+kaggle.json
+.kaggle/
+
+# --- editor / tool config (not part of methods or results) --------------------
+.claude/
+.vscode/
+.idea/
+
+# --- python -------------------------------------------------------------------
+__pycache__/
+*.py[cod]
+.ipynb_checkpoints/
+.venv/
+venv/
+.DS_Store
+
+# =============================================================================
+# Deliberately COMMITTED (listed for the next reader, not as ignore rules):
+#
+#   *.py                              all pipeline scripts
+#   README.md                         pipeline order, results, limitations
+#   feature_spec.csv                  column-level leakage audit, no patient rows
+#   norm_stats.json                   aggregate pixel mean/std
+#   impute_stats.json                 aggregate train medians/modes
+#   final_test_results.csv            5 rows, model-level metrics
+#   multiseed_ablations.csv           6 rows, seed-level metrics
+#   finetune_multiseed.csv            15 rows, fold-level metrics
+#   ablation_*.csv, fusion_cv_*.csv   5 rows each, fold-level metrics
+#   calibration_fusion_results.csv    2 rows, model-level metrics
+#   *.png                             calibration plots, aggregate only
+#
+# No model weight files exist -- nothing is checkpointed to disk. Every model is
+# trained inside the run that evaluates it, so weights would need saving
+# deliberately if you ever want them committed.
+# =============================================================================

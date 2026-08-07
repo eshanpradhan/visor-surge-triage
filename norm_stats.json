@@ -1,0 +1,13 @@
+{
+  "mean": 0.495948,
+  "std": 0.240217,
+  "weighting": "per_image",
+  "split": "train",
+  "n_images": 955,
+  "n_pixels": 212516864,
+  "scale": "0-1 (uint8 / 255)",
+  "channels": 1,
+  "pixel_pooled_mean": 0.495954,
+  "pixel_pooled_std": 0.240386,
+  "source_manifest": "visor_manifest_split.csv"
+}
