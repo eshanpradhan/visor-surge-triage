@@ -68,6 +68,21 @@ fold- or model-level metrics.
 | 20 | `calibrate.py` | Post-hoc Platt/isotonic scaling, fitted on val predictions from a train-only model. → `calibration_fusion_before_after.png` |
 | 21 | `save_final_weights.py` | Trains the final models once and writes parameters to `models/` so inference runs without retraining or redownloading the image archive. → `models/` |
 
+### Demo
+
+```bash
+streamlit run app.py
+```
+
+Local-only dashboard: pick one of five held-out test patients, see the
+radiograph, the calibrated fusion risk and tier, a Grad-CAM overlay, clinical
+attributions, and the clinical-only model's score for comparison. Requires the
+gitignored cohort files — regenerate them with steps 1–5 first.
+
+`clinical_service.py` exists because LightGBM cannot be called from a process
+that has imported torch (see the environment note below); the app scores the
+comparison model in a subprocess.
+
 ### Saved models (`models/`, committed)
 
 Fitted parameters and aggregate preprocessing statistics only — no patient rows.
