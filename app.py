@@ -52,22 +52,47 @@ st.set_page_config(page_title="VISOR — surge triage demo", layout="wide")
 # artifact loading
 # --------------------------------------------------------------------------
 
+def real_cohort_available() -> bool:
+    """Demo mode is the fallback whenever the gitignored cohort files are absent.
+
+    A deployed copy of this app has the committed artifacts but not the patient
+    data, so it lands in demo mode automatically rather than erroring. Setting
+    VISOR_DEMO_MODE=1 forces demo mode even on a machine that has the data,
+    which is how to rehearse the public build locally.
+    """
+    import os
+
+    if os.environ.get("VISOR_DEMO_MODE") == "1":
+        return False
+    return (ROOT / "visor_manifest_split.csv").exists() and (ROOT / "COVID-19-NY-SBU").is_dir()
+
+
 @st.cache_resource(show_spinner="Loading models and cohort…")
 def load_everything():
     import torch
 
     import fusion_model as FM
-    from features import build_feature_frame
 
     device = torch.device("cpu")  # one image at a time; CPU keeps this deterministic
+    demo_mode = not real_cohort_available()
 
-    pool = build_feature_frame(split=None)
-    train = pool[pool["split"] == "train"].reset_index(drop=True)
-    test = pool[pool["split"] == "test"].reset_index(drop=True)
+    if demo_mode:
+        # encoder restored from committed statistics; no training data required
+        from demo_data import build_demo_frame
 
-    # same preprocessing path as training: fit on train, apply to test
-    prepared, encoder = FM.prepare_fold(train, {"test": test}, (CALENDAR_COLUMN,))
-    test_imputed, test_clinical = prepared["test"]
+        test_imputed, encoder = build_demo_frame()
+        test_clinical = encoder.transform(test_imputed)
+    else:
+        from features import build_feature_frame
+
+        pool = build_feature_frame(split=None)
+        train = pool[pool["split"] == "train"].reset_index(drop=True)
+        test = pool[pool["split"] == "test"].reset_index(drop=True)
+
+        # same preprocessing path as training: fit on train, apply to test
+        prepared, encoder = FM.prepare_fold(train, {"test": test}, (CALENDAR_COLUMN,))
+        test_imputed, test_clinical = prepared["test"]
+
     n_clinical = test_clinical.shape[1]
 
     model = FM.FusionModel(n_clinical, FM.MODALITY_DROPOUT_P, use_image=True)
@@ -84,28 +109,34 @@ def load_everything():
         "FM": FM,
         "model": model,
         "encoder": encoder,
-        "test_frame": test_imputed,
+        "test_frame": test_imputed.reset_index(drop=True),
         "test_clinical": test_clinical,
         "calibrator": calibrator,
         "feature_names": encoder.feature_names,
+        "demo_mode": demo_mode,
     }
 
 
 @st.cache_resource(show_spinner="Scoring the clinical comparison model…")
-def load_clinical_scores(indices: tuple[int, ...]) -> dict:
+def load_clinical_scores(feature_key: str, features: tuple) -> dict:
     """Score the clinical LightGBM model in a separate, torch-free process.
 
     LightGBM cannot be called at all from a process that has imported torch: the
     two OpenMP runtimes collide and even a single-row predict segfaults with no
     traceback. Streamlit needs torch in-process for the fusion model and
-    Grad-CAM, so the booster runs in a subprocess and returns JSON. One call
-    covers every demo patient, so this happens once per session.
+    Grad-CAM, so the booster runs in a subprocess. The already-encoded matrix is
+    sent on stdin, which keeps the subprocess independent of the training data
+    and so works in demo mode too.
+
+    ``feature_key`` exists only to give the cache a cheap hashable identity.
     """
     import subprocess
     import sys
 
+    payload = json.dumps({"features": [list(row) for row in features]})
     result = subprocess.run(
-        [sys.executable, str(ROOT / "clinical_service.py"), *map(str, indices)],
+        [sys.executable, str(ROOT / "clinical_service.py")],
+        input=payload,
         capture_output=True,
         text=True,
         cwd=str(ROOT),
@@ -238,8 +269,16 @@ def shorten(name: str, limit: int = 42) -> str:
 # --------------------------------------------------------------------------
 
 @st.cache_data(show_spinner=False)
-def pick_demo_patients(_frame: pd.DataFrame, n_severe: int = 3, n_mild: int = 2):
-    """A fixed, reproducible mix of outcomes from the test split."""
+def pick_demo_patients(_frame: pd.DataFrame, demo_mode: bool,
+                       n_severe: int = 3, n_mild: int = 2):
+    """Which rows to offer as one-click cases.
+
+    In demo mode every synthetic patient is shown. Otherwise a fixed,
+    reproducible mix of real outcomes is drawn from the test split.
+    """
+    if demo_mode:
+        return list(range(len(_frame)))
+
     severe = _frame.index[_frame["severe"]].tolist()
     mild = _frame.index[~_frame["severe"]].tolist()
     rng = np.random.default_rng(42)
@@ -259,23 +298,38 @@ def main() -> None:
         artifacts = load_everything()
     except FileNotFoundError as error:
         st.error(
-            f"Missing a local data file: `{error}`\n\n"
-            "Demo patients are read from the gitignored cohort files. Regenerate them by "
-            "running the pipeline in the order documented in README.md."
+            f"Missing a required file: `{error}`\n\n"
+            "The committed artifacts in `models/` and `demo_assets/` are needed even in "
+            "demo mode. For real patients, regenerate the cohort files by running the "
+            "pipeline in the order documented in README.md."
         )
         return
 
+    demo_mode = artifacts["demo_mode"]
+    if demo_mode:
+        from demo_data import DEMO_PATIENTS, DISCLAIMER
+
+        st.warning(DISCLAIMER)
+        narratives = {p["demo_id"]: p for p in DEMO_PATIENTS}
+
     frame = artifacts["test_frame"]
-    demo_indices = pick_demo_patients(frame)
+    demo_indices = pick_demo_patients(frame, demo_mode)
 
     with st.sidebar:
-        st.header("Demo patients")
-        st.caption("Held-out test split. Ground truth shown after scoring.")
+        st.header("Demo patients" if demo_mode else "Patients")
+        st.caption(
+            "Synthetic cases — not real people."
+            if demo_mode
+            else "Held-out test split. Ground truth shown after scoring."
+        )
         if "selected" not in st.session_state:
             st.session_state.selected = demo_indices[0]
         for index in demo_indices:
             row = frame.loc[index]
-            label = f"{row['patient_id']} · {row['age.splits']} · {row['gender_concept_name']}"
+            if demo_mode:
+                label = f"{row['patient_id']} · {narratives[row['patient_id']]['summary']}"
+            else:
+                label = f"{row['patient_id']} · {row['age.splits']} · {row['gender_concept_name']}"
             if st.button(label, key=f"patient_{index}", use_container_width=True):
                 st.session_state.selected = index
         st.divider()
@@ -287,17 +341,20 @@ def main() -> None:
     index = st.session_state.selected
     row = frame.loc[index]
 
-    clinical_scores = load_clinical_scores(tuple(demo_indices))
+    rows = tuple(tuple(float(v) for v in artifacts["test_clinical"][i]) for i in demo_indices)
+    clinical_scores = load_clinical_scores("demo" if demo_mode else "test", rows)
+    position = demo_indices.index(index)
 
     with st.spinner("Scoring…"):
         logit, cam, clinical_attribution = fusion_score_and_cam(artifacts, index)
         probability = apply_calibrator(logit, artifacts["calibrator"])
         base_image, blended = overlay_cam(row["filepath"], cam)
 
-    entry = clinical_scores["patients"][str(index)]
-    clinical_probability = entry["probability"]
+    clinical_probability = clinical_scores["probabilities"][position]
     fusion_top = top_contributions(artifacts["feature_names"], clinical_attribution)
-    reference_top = top_contributions(clinical_scores["feature_names"], entry["contributions"])
+    reference_top = top_contributions(
+        artifacts["feature_names"], clinical_scores["contributions"][position]
+    )
 
     tier, colour = tier_for(probability)
 
@@ -331,8 +388,15 @@ def main() -> None:
             unsafe_allow_html=True,
         )
 
-        actual = "ICU or ventilated" if row["severe"] else "neither"
-        st.info(f"Ground truth for this held-out patient: **{actual}**")
+        if demo_mode:
+            st.info(
+                f"**{narratives[row['patient_id']]['narrative']}**  \n"
+                "No ground truth exists — this case is synthetic and the radiograph "
+                "carries no COVID severity label."
+            )
+        else:
+            actual = "ICU or ventilated" if row["severe"] else "neither"
+            st.info(f"Ground truth for this held-out patient: **{actual}**")
 
         st.markdown("**Clinical drivers (fusion model)**")
         chart = fusion_top.copy()

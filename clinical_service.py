@@ -3,67 +3,49 @@
 LightGBM cannot run in a process that has imported torch: on macOS the two
 OpenMP runtimes collide and any call into the booster segfaults, including a
 single-row predict. The Streamlit app needs torch for the fusion model and
-Grad-CAM, so the clinical comparison model is scored here instead and the result
-is passed back as JSON on stdout.
+Grad-CAM, so the clinical comparison model is scored here instead.
 
-Usage:
-    python3 clinical_service.py 107 16 126 176 19
+The caller sends an already-encoded feature matrix on stdin and receives
+probabilities and exact TreeSHAP contributions on stdout. Taking the matrix
+rather than re-deriving it keeps this script independent of the training data,
+so it works identically for real patients and for demo mode, which has no access
+to the cohort files.
 
-Emits, for each requested test-split row index, the LightGBM probability and its
-exact TreeSHAP contributions. Nothing is written to disk -- the output contains
-per-patient values and is held in the caller's memory only.
+Protocol:
+    stdin   {"features": [[...74 floats...], ...]}
+    stdout  {"probabilities": [...], "contributions": [[...], ...]}
+
+Nothing is written to disk.
 """
 
 import json
 import sys
 
-import baseline as B
-from features import build_feature_frame
-
-CALENDAR_COLUMN = "visit_start_datetime"
 BOOSTER_PATH = "models/clinical_lightgbm_calendar_ablated.txt"
 
 
 def main() -> None:
     assert "torch" not in sys.modules, "torch is loaded; LightGBM will segfault"
     import lightgbm as lgb
+    import numpy as np
 
-    indices = [int(a) for a in sys.argv[1:]]
-    assert indices, "no row indices given"
-
-    pool = build_feature_frame(split=None)
-    train = pool[pool["split"] == "train"].reset_index(drop=True)
-    test = pool[pool["split"] == "test"].reset_index(drop=True)
-
-    # identical preprocessing to fusion_model.prepare_fold: fit on train, drop
-    # the calendar column, apply to test
-    matrices, encoder = B.prepare(
-        train.drop(columns=[CALENDAR_COLUMN]),
-        {"test": test.drop(columns=[CALENDAR_COLUMN])},
-        strict=True,
-    )
-    x_test, _y_test = matrices["test"]
+    payload = json.load(sys.stdin)
+    features = np.asarray(payload["features"], dtype=float)
+    assert features.ndim == 2, f"expected a 2-D feature matrix, got shape {features.shape}"
 
     booster = lgb.Booster(model_file=BOOSTER_PATH)
-    assert booster.num_feature() == x_test.shape[1], (
-        f"booster expects {booster.num_feature()} features, matrix has {x_test.shape[1]}"
+    assert booster.num_feature() == features.shape[1], (
+        f"booster expects {booster.num_feature()} features, received {features.shape[1]}"
     )
 
-    rows = x_test[indices]
-    probabilities = booster.predict(rows)
-    contributions = booster.predict(rows, pred_contrib=True)
+    probabilities = booster.predict(features)
+    contributions = booster.predict(features, pred_contrib=True)
 
     json.dump(
         {
-            "feature_names": encoder.feature_names,
-            "patients": {
-                str(index): {
-                    "probability": float(probabilities[position]),
-                    # final column is the model's base value, not a feature
-                    "contributions": contributions[position][:-1].tolist(),
-                }
-                for position, index in enumerate(indices)
-            },
+            "probabilities": [float(p) for p in probabilities],
+            # final column is the model's base value, not a feature
+            "contributions": [row[:-1].tolist() for row in contributions],
         },
         sys.stdout,
     )

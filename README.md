@@ -71,17 +71,33 @@ fold- or model-level metrics.
 ### Demo
 
 ```bash
+pip install -r requirements.txt
 streamlit run app.py
 ```
 
-Local-only dashboard: pick one of five held-out test patients, see the
-radiograph, the calibrated fusion risk and tier, a Grad-CAM overlay, clinical
-attributions, and the clinical-only model's score for comparison. Requires the
-gitignored cohort files — regenerate them with steps 1–5 first.
+Dashboard: pick a patient, see the radiograph, the calibrated fusion risk and
+tier, a Grad-CAM overlay, clinical attributions for the fusion model, and the
+clinical-only model's score for comparison. Runs entirely locally.
+
+**Two modes, selected automatically.** With the gitignored cohort files present
+the app scores five real held-out test patients. Without them — a fresh clone, or
+a deployment — it falls back to **demo mode**: three synthetic cases from
+`demo_data.py` paired with public NIH ChestX-ray14 sample images in
+`demo_assets/`, behind a disclaimer banner. Force it locally with
+`VISOR_DEMO_MODE=1`.
+
+Demo-mode scores are not clinically meaningful. The model was trained on SBU
+radiographs; an NIH image with invented labs is out of distribution on both
+inputs. Demo mode shows that the pipeline runs, nothing more — all reported
+performance comes from the held-out SBU test split.
+
+Demo mode needs no training data: the encoder is restored from
+`models/encoder_state.json` and unspecified variables are filled from
+`models/impute_stats_final.json`.
 
 `clinical_service.py` exists because LightGBM cannot be called from a process
-that has imported torch (see the environment note below); the app scores the
-comparison model in a subprocess.
+that has imported torch (see the environment note below); the app sends it an
+encoded feature matrix and gets scores back, which keeps it working in both modes.
 
 ### Saved models (`models/`, committed)
 
