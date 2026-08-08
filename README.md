@@ -77,7 +77,13 @@ streamlit run app.py
 
 Dashboard: pick a patient, see the radiograph, the calibrated fusion risk and
 tier, a Grad-CAM overlay, clinical attributions for the fusion model, and the
-clinical-only model's score for comparison. Runs entirely locally.
+clinical-only model's score for comparison. Inference runs locally and no patient
+data leaves the machine.
+
+One network call, first boot only: the checkpoint holds just the trained tensors,
+so torchvision fetches the frozen ImageNet ResNet-50 (~98 MB) if the torch cache
+is cold. The app surfaces this as its own progress state rather than letting a
+fresh deployment sit on a generic spinner for a minute. Cached thereafter.
 
 **Two modes, selected automatically.** With the gitignored cohort files present
 the app scores five real held-out test patients. Without them — a fresh clone, or

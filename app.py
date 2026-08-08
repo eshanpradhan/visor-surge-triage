@@ -1,28 +1,35 @@
 """VISOR — local Streamlit demo. Run with: streamlit run app.py
 
 Loads the committed artifacts in models/ and scores real patients from the test
-split. Everything runs on this machine: no network calls, no telemetry, no
-patient data leaving the process. The ResNet-50 layers below layer4 come from
-torchvision's local cache rather than a download.
+split. Inference is local: no telemetry, and no patient data leaves the process.
 
-Requires the local data files
------------------------------
-Demo patients are read at runtime from visor_manifest_split.csv and the image
-archive. Those are gitignored per data-use terms and are deliberately NOT baked
+One exception to "no network", on first boot only. The checkpoint stores just the
+68 tensors that were trained; the ResNet-50 layers below layer4 are frozen at
+ImageNet initialization and are fetched by torchvision. On a machine with a warm
+torch cache that is a disk read, but a fresh deployment downloads ~98 MB from
+download.pytorch.org before the first prediction. Nothing about a patient is sent
+anywhere -- it is a one-time model-weight fetch -- but it does mean the first load
+is slow, so it gets its own progress state rather than hiding inside a generic
+spinner.
+
+Two modes
+---------
+Real patients are read at runtime from visor_manifest_split.csv and the image
+archive, which are gitignored per data-use terms and are deliberately NOT baked
 into this file -- hardcoding patient rows here would put them in git history.
-Anyone cloning the repo needs to regenerate them by running the pipeline in the
-order documented in README.md.
+When those files are absent (a fresh clone, or a deployment) the app falls back
+to demo_data.py: synthetic cases with public NIH images, behind a banner.
 
-What the two explanations actually explain
-------------------------------------------
-Grad-CAM is computed on the fusion model itself, so it shows what the displayed
-risk score is looking at.
+What each explanation explains
+------------------------------
+Grad-CAM and the "Clinical drivers (fusion model)" chart both come from one
+backward pass through the fusion model, so together they attribute the score
+actually on screen across both of its inputs. The clinical attribution is
+gradient x input -- a local linearization, not an exact decomposition.
 
-The SHAP bar chart is exact TreeSHAP from the clinical-only LightGBM booster,
-not from the fusion model's clinical branch. It explains the comparison model
-shown alongside, and is labelled that way in the UI. Attributing the fusion
-model's clinical pathway would need a sampling-based explainer and is not what
-this chart is.
+"Feature importance (clinical-only reference model)" is exact TreeSHAP from the
+LightGBM comparison model. It explains that model, not the fusion decision, and
+is collapsed and labelled accordingly.
 """
 
 import json
@@ -51,6 +58,45 @@ st.set_page_config(page_title="VISOR — surge triage demo", layout="wide")
 # --------------------------------------------------------------------------
 # artifact loading
 # --------------------------------------------------------------------------
+
+def backbone_weights_cached() -> bool:
+    """Is the ImageNet ResNet-50 checkpoint already on disk?
+
+    torchvision downloads it on demand, so this is only used to decide whether to
+    warn the user about a slow first load -- not to gate anything.
+    """
+    import torch
+    from torchvision.models import ResNet50_Weights
+
+    url = ResNet50_Weights.IMAGENET1K_V1.url
+    destination = Path(torch.hub.get_dir()) / "checkpoints" / Path(url).name
+    return destination.exists()
+
+
+@st.cache_resource(show_spinner=False)
+def ensure_backbone_weights() -> bool:
+    """Fetch the ImageNet weights up front so the wait is visible and explained.
+
+    Without this the download happens silently inside model construction, and a
+    cold deployment looks hung for a minute with a spinner that says it is
+    loading models. Returns True if a download was performed.
+    """
+    import torch
+    from torchvision.models import ResNet50_Weights
+
+    if backbone_weights_cached():
+        return False
+
+    with st.status(
+        "First run: downloading ImageNet ResNet-50 weights (~98 MB). "
+        "This happens once, then it is cached.",
+        expanded=False,
+    ):
+        torch.hub.load_state_dict_from_url(
+            ResNet50_Weights.IMAGENET1K_V1.url, progress=False
+        )
+    return True
+
 
 def real_cohort_available() -> bool:
     """Demo mode is the fallback whenever the gitignored cohort files are absent.
@@ -299,6 +345,8 @@ def main() -> None:
         "admission chest radiograph plus clinical data. Research demo — not a clinical tool."
     )
 
+    downloaded = ensure_backbone_weights()
+
     try:
         artifacts = load_everything()
     except FileNotFoundError as error:
@@ -309,6 +357,11 @@ def main() -> None:
             "pipeline in the order documented in README.md."
         )
         return
+
+    if downloaded:
+        st.caption(
+            "ImageNet backbone downloaded and cached on this instance — later loads are fast."
+        )
 
     demo_mode = artifacts["demo_mode"]
     if demo_mode:
@@ -439,8 +492,10 @@ def main() -> None:
     st.divider()
     st.caption(FOOTER)
     st.caption(
-        "Runs entirely locally — no network calls, no data leaves this machine. "
-        "Model fit on the train split (n=955); val was reserved to fit the calibrator."
+        "Inference runs locally — no patient data leaves this machine. The frozen "
+        "ImageNet backbone is fetched from torchvision once on first run and cached "
+        "thereafter. Model fit on the train split (n=955); val was reserved to fit "
+        "the calibrator."
     )
 
 
