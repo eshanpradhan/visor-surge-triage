@@ -42,6 +42,8 @@ figcaption { color:var(--muted); font-size:.76rem; margin-top:.3rem; text-align:
   color:var(--muted); margin-bottom:.15rem; }
 .slider-row output { font-variant-numeric:tabular-nums; color:var(--fg); font-weight:600; }
 .slider-row input { width:100%; accent-color:#2b6cb0; }
+.spark { width:100%; height:26px; display:block; margin-top:-2px; overflow:visible; }
+.spark-note { font-size:.72rem; opacity:.85; margin:.1rem 0 .3rem; }
 .reset { margin-top:.6rem; padding:.35rem .7rem; font:inherit; font-size:.8rem;
   border:1px solid var(--line); background:var(--card); color:inherit; border-radius:5px;
   cursor:pointer; }
@@ -62,9 +64,9 @@ from an admission chest radiograph plus clinical data. Research demo — not a c
 <div class="banner"><b>Demonstration mode — synthetic data.</b>
 These are not real patients. The radiographs are public NIH ChestX-ray14 samples unrelated to the training cohort, and the clinical values are invented. Scores show that the pipeline runs; they are not clinically meaningful and are not evidence about model accuracy. Reported performance comes from the held-out SBU test split, not from anything shown here.</div>
 
-<div class="cases"><button class="case-btn active" onclick="showCase(0)"><b>DEMO-A</b><span>68-year-old, hypertensive, mild presentation</span></button><button class="case-btn" onclick="showCase(1)"><b>DEMO-B</b><span>55-year-old, diabetic, intermediate presentation</span></button><button class="case-btn" onclick="showCase(2)"><b>DEMO-C</b><span>80-year-old, COPD, severe-looking presentation</span></button></div>
+<div class="cases"><button class="case-btn" onclick="showCase(0)"><b>DEMO-A</b><span>68-year-old, hypertensive, mild presentation</span></button><button class="case-btn active" onclick="showCase(1)"><b>DEMO-B</b><span>55-year-old, diabetic, intermediate presentation</span></button><button class="case-btn" onclick="showCase(2)"><b>DEMO-C</b><span>80-year-old, COPD, severe-looking presentation</span></button></div>
 
-<section class="case" id="case-0" >
+<section class="case" id="case-0" hidden>
   <div class="grid">
     <div class="col">
       <h3>Chest radiograph</h3>
@@ -83,35 +85,46 @@ These are not real patients. The radiographs are public NIH ChestX-ray14 samples
       score shown is exact model output rather than an estimate. Sliders snap to the
       precomputed values.</p>
       <p class="muted">The calibrated percentage moves in visible steps, and some
-      sliders will not move it at all. That is the isotonic calibrator, which was
-      fitted on 205 validation points and so maps a range of model scores onto each
-      output level. The uncalibrated score underneath changes continuously — watch
-      that one to see a slider taking effect.</p>
+      sliders will not move it at all. That is the isotonic calibrator: fitted on 205
+      validation points, it maps a range of model scores onto each of nine output
+      levels. The trace under each slider shows the model score across that slider's
+      whole range with your current position marked, so the direction of effect is
+      visible even when the headline percentage has not crossed a step.</p>
       <div class="slider-row">
   <label>Lymphocytes
     <output id="out-0-0">1.6 K/µL</output></label>
   <input type="range" id="in-0-0" min="0" max="6" step="1"
          value="3" oninput="onSlide(0,0,this.value)">
+  <svg class="spark" id="spark-0-0" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-0-0"></p>
 </div><div class="slider-row">
   <label>CRP
     <output id="out-0-1">1.8 mg/dL</output></label>
   <input type="range" id="in-0-1" min="0" max="6" step="1"
          value="0" oninput="onSlide(0,1,this.value)">
+  <svg class="spark" id="spark-0-1" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-0-1"></p>
 </div><div class="slider-row">
   <label>SpO₂
     <output id="out-0-2">97 %</output></label>
   <input type="range" id="in-0-2" min="0" max="6" step="1"
          value="5" oninput="onSlide(0,2,this.value)">
+  <svg class="spark" id="spark-0-2" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-0-2"></p>
 </div><div class="slider-row">
   <label>Days of symptoms
     <output id="out-0-3">3 days</output></label>
   <input type="range" id="in-0-3" min="0" max="6" step="1"
          value="1" oninput="onSlide(0,3,this.value)">
+  <svg class="spark" id="spark-0-3" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-0-3"></p>
 </div><div class="slider-row">
   <label>Temperature
     <output id="out-0-4">36.9 °C</output></label>
   <input type="range" id="in-0-4" min="0" max="6" step="1"
          value="2" oninput="onSlide(0,4,this.value)">
+  <svg class="spark" id="spark-0-4" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-0-4"></p>
 </div>
       <button class="reset" onclick="resetCase(0)">Reset to this case's values</button>
     </div>
@@ -148,7 +161,7 @@ These are not real patients. The radiographs are public NIH ChestX-ray14 samples
     </div>
   </div>
 </section>
-<section class="case" id="case-1" hidden>
+<section class="case" id="case-1" >
   <div class="grid">
     <div class="col">
       <h3>Chest radiograph</h3>
@@ -167,35 +180,46 @@ These are not real patients. The radiographs are public NIH ChestX-ray14 samples
       score shown is exact model output rather than an estimate. Sliders snap to the
       precomputed values.</p>
       <p class="muted">The calibrated percentage moves in visible steps, and some
-      sliders will not move it at all. That is the isotonic calibrator, which was
-      fitted on 205 validation points and so maps a range of model scores onto each
-      output level. The uncalibrated score underneath changes continuously — watch
-      that one to see a slider taking effect.</p>
+      sliders will not move it at all. That is the isotonic calibrator: fitted on 205
+      validation points, it maps a range of model scores onto each of nine output
+      levels. The trace under each slider shows the model score across that slider's
+      whole range with your current position marked, so the direction of effect is
+      visible even when the headline percentage has not crossed a step.</p>
       <div class="slider-row">
   <label>Lactate
     <output id="out-1-0">2.1 mmol/L</output></label>
   <input type="range" id="in-1-0" min="0" max="6" step="1"
          value="2" oninput="onSlide(1,0,this.value)">
+  <svg class="spark" id="spark-1-0" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-1-0"></p>
 </div><div class="slider-row">
   <label>D-dimer
     <output id="out-1-1">1450 ng/mL</output></label>
   <input type="range" id="in-1-1" min="0" max="6" step="1"
          value="1" oninput="onSlide(1,1,this.value)">
+  <svg class="spark" id="spark-1-1" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-1-1"></p>
 </div><div class="slider-row">
   <label>Respiratory rate
     <output id="out-1-2">24 /min</output></label>
   <input type="range" id="in-1-2" min="0" max="6" step="1"
          value="3" oninput="onSlide(1,2,this.value)">
+  <svg class="spark" id="spark-1-2" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-1-2"></p>
 </div><div class="slider-row">
   <label>CRP
     <output id="out-1-3">14.5 mg/dL</output></label>
   <input type="range" id="in-1-3" min="0" max="6" step="1"
          value="2" oninput="onSlide(1,3,this.value)">
+  <svg class="spark" id="spark-1-3" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-1-3"></p>
 </div><div class="slider-row">
   <label>Procalcitonin
     <output id="out-1-4">0.6 ng/mL</output></label>
   <input type="range" id="in-1-4" min="0" max="6" step="1"
          value="1" oninput="onSlide(1,4,this.value)">
+  <svg class="spark" id="spark-1-4" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-1-4"></p>
 </div>
       <button class="reset" onclick="resetCase(1)">Reset to this case's values</button>
     </div>
@@ -251,35 +275,46 @@ These are not real patients. The radiographs are public NIH ChestX-ray14 samples
       score shown is exact model output rather than an estimate. Sliders snap to the
       precomputed values.</p>
       <p class="muted">The calibrated percentage moves in visible steps, and some
-      sliders will not move it at all. That is the isotonic calibrator, which was
-      fitted on 205 validation points and so maps a range of model scores onto each
-      output level. The uncalibrated score underneath changes continuously — watch
-      that one to see a slider taking effect.</p>
+      sliders will not move it at all. That is the isotonic calibrator: fitted on 205
+      validation points, it maps a range of model scores onto each of nine output
+      levels. The trace under each slider shows the model score across that slider's
+      whole range with your current position marked, so the direction of effect is
+      visible even when the headline percentage has not crossed a step.</p>
       <div class="slider-row">
   <label>Lactate
     <output id="out-2-0">3.4 mmol/L</output></label>
   <input type="range" id="in-2-0" min="0" max="6" step="1"
          value="3" oninput="onSlide(2,0,this.value)">
+  <svg class="spark" id="spark-2-0" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-2-0"></p>
 </div><div class="slider-row">
   <label>CRP
     <output id="out-2-1">28 mg/dL</output></label>
   <input type="range" id="in-2-1" min="0" max="6" step="1"
          value="4" oninput="onSlide(2,1,this.value)">
+  <svg class="spark" id="spark-2-1" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-2-1"></p>
 </div><div class="slider-row">
   <label>Respiratory rate
     <output id="out-2-2">32 /min</output></label>
   <input type="range" id="in-2-2" min="0" max="6" step="1"
          value="4" oninput="onSlide(2,2,this.value)">
+  <svg class="spark" id="spark-2-2" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-2-2"></p>
 </div><div class="slider-row">
   <label>D-dimer
     <output id="out-2-3">4200 ng/mL</output></label>
   <input type="range" id="in-2-3" min="0" max="6" step="1"
          value="4" oninput="onSlide(2,3,this.value)">
+  <svg class="spark" id="spark-2-3" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-2-3"></p>
 </div><div class="slider-row">
   <label>Procalcitonin
     <output id="out-2-4">1.9 ng/mL</output></label>
   <input type="range" id="in-2-4" min="0" max="6" step="1"
          value="2" oninput="onSlide(2,4,this.value)">
+  <svg class="spark" id="spark-2-4" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-2-4"></p>
 </div>
       <button class="reset" onclick="resetCase(2)">Reset to this case's values</button>
     </div>
@@ -359,8 +394,11 @@ function recompute(ci) {
   let ri = 0; for (const p of pos) ri = ri * c.steps + p;
   const raw = c.rawGrid[ri];
   const [tier, colour] = tierFor(risk);
+  const rawDelta = raw - c.rawBaseline;
+  const arrow = Math.abs(rawDelta) < 0.0005 ? "" :
+    (rawDelta > 0 ? ` ▲ +${(rawDelta * 100).toFixed(1)}` : ` ▼ ${(rawDelta * 100).toFixed(1)}`);
   document.getElementById(`raw-${ci}`).textContent =
-    `Uncalibrated model score: ${(raw * 100).toFixed(1)}% `
+    `Uncalibrated model score: ${(raw * 100).toFixed(1)}%${arrow} `
     + `(at this case's values: ${(c.rawBaseline * 100).toFixed(1)}%)`;
   document.getElementById(`pct-${ci}`).textContent = Math.round(risk * 100) + "%";
   document.getElementById(`tier-${ci}`).textContent = tier + " RISK";
@@ -376,12 +414,50 @@ function recompute(ci) {
   }
 }
 
+// The trace for slider j is the raw model score across its seven positions with
+// every other slider held where the viewer has left it. It is therefore conditional
+// on the current state and is redrawn whenever anything moves. All values come from
+// the precomputed grid -- nothing is inferred or smoothed.
+function drawSpark(ci, j) {
+  const c = CASES[ci], pos = positionsFor(ci), n = c.steps;
+  const series = [];
+  for (let k = 0; k < n; k++) {
+    const p = pos.slice(); p[k === k ? j : j] = k;
+    let i = 0; for (const q of p) i = i * n + q;
+    series.push(c.rawGrid[i]);
+  }
+  const lo = Math.min(...series), hi = Math.max(...series);
+  const span = (hi - lo) || 1;
+  const x = k => 4 + k * (192 / (n - 1));
+  // flat traces sit mid-height rather than pinning to an edge
+  const y = v => (hi - lo < 1e-6) ? 13 : 22 - ((v - lo) / span) * 18;
+
+  const points = series.map((v, k) => `${x(k).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const here = pos[j];
+  const rising = series[n - 1] >= series[0];
+  const colour = rising ? "#c0392b" : "#1e8449";
+  const svg = document.getElementById(`spark-${ci}-${j}`);
+  svg.innerHTML =
+    `<polyline points="${points}" fill="none" stroke="${colour}" stroke-width="1.6"
+       stroke-opacity=".85" vector-effect="non-scaling-stroke"/>` +
+    `<circle cx="${x(here).toFixed(1)}" cy="${y(series[here]).toFixed(1)}" r="3"
+       fill="${colour}"/>`;
+
+  const note = document.getElementById(`note-${ci}-${j}`);
+  note.textContent = (hi - lo < 1e-6)
+    ? `model score flat at ${(lo * 100).toFixed(1)}% across this range`
+    : `model score ${(series[0] * 100).toFixed(1)}% → ${(series[n - 1] * 100).toFixed(1)}% `
+      + `across this range (now ${(series[here] * 100).toFixed(1)}%)`;
+  note.style.color = colour;
+}
+
 function onSlide(ci, j, pos) {
   const s = CASES[ci].sliders[j];
   const value = s.values[parseInt(pos, 10)];
   document.getElementById(`out-${ci}-${j}`).textContent =
     value.toFixed(Math.abs(value) < 10 ? 1 : 0) + " " + s.unit;
   recompute(ci);
+  CASES[ci].sliders.forEach((_, k) => drawSpark(ci, k));
 }
 
 function resetCase(ci) {
@@ -390,6 +466,10 @@ function resetCase(ci) {
     onSlide(ci, j, s.baseIndex);
   });
 }
+
+window.addEventListener("DOMContentLoaded", () => {
+  CASES.forEach((c, ci) => c.sliders.forEach((_, j) => drawSpark(ci, j)));
+});
 
 document.addEventListener("wheel", e => {
   if (e.target instanceof HTMLInputElement && e.target.type === "range") e.target.blur();

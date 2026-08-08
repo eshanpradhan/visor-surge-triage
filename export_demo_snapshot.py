@@ -51,6 +51,13 @@ TOP_N = 8
 SWEEP_FEATURES = 5
 SWEEP_STEPS = 7
 
+# Which case is selected on page load. DEMO-A's raw score sits deep inside the
+# bottom bin of the isotonic calibrator, so single-slider moves rarely cross a bin
+# edge and the badge appears frozen at the 1% floor -- a poor first impression even
+# though nothing is wrong. DEMO-B responds to every combination. Button order is
+# unchanged and all three stay one click away.
+DEFAULT_CASE_ID = "DEMO-B"
+
 SNAPSHOT_NOTE = (
     "This is a static snapshot of the live dashboard's output for demonstration "
     "purposes — see the GitHub repo for the full interactive version and source code."
@@ -308,8 +315,11 @@ function recompute(ci) {
   let ri = 0; for (const p of pos) ri = ri * c.steps + p;
   const raw = c.rawGrid[ri];
   const [tier, colour] = tierFor(risk);
+  const rawDelta = raw - c.rawBaseline;
+  const arrow = Math.abs(rawDelta) < 0.0005 ? "" :
+    (rawDelta > 0 ? ` ▲ +${(rawDelta * 100).toFixed(1)}` : ` ▼ ${(rawDelta * 100).toFixed(1)}`);
   document.getElementById(`raw-${ci}`).textContent =
-    `Uncalibrated model score: ${(raw * 100).toFixed(1)}% `
+    `Uncalibrated model score: ${(raw * 100).toFixed(1)}%${arrow} `
     + `(at this case's values: ${(c.rawBaseline * 100).toFixed(1)}%)`;
   document.getElementById(`pct-${ci}`).textContent = Math.round(risk * 100) + "%";
   document.getElementById(`tier-${ci}`).textContent = tier + " RISK";
@@ -325,12 +335,50 @@ function recompute(ci) {
   }
 }
 
+// The trace for slider j is the raw model score across its seven positions with
+// every other slider held where the viewer has left it. It is therefore conditional
+// on the current state and is redrawn whenever anything moves. All values come from
+// the precomputed grid -- nothing is inferred or smoothed.
+function drawSpark(ci, j) {
+  const c = CASES[ci], pos = positionsFor(ci), n = c.steps;
+  const series = [];
+  for (let k = 0; k < n; k++) {
+    const p = pos.slice(); p[k === k ? j : j] = k;
+    let i = 0; for (const q of p) i = i * n + q;
+    series.push(c.rawGrid[i]);
+  }
+  const lo = Math.min(...series), hi = Math.max(...series);
+  const span = (hi - lo) || 1;
+  const x = k => 4 + k * (192 / (n - 1));
+  // flat traces sit mid-height rather than pinning to an edge
+  const y = v => (hi - lo < 1e-6) ? 13 : 22 - ((v - lo) / span) * 18;
+
+  const points = series.map((v, k) => `${x(k).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const here = pos[j];
+  const rising = series[n - 1] >= series[0];
+  const colour = rising ? "#c0392b" : "#1e8449";
+  const svg = document.getElementById(`spark-${ci}-${j}`);
+  svg.innerHTML =
+    `<polyline points="${points}" fill="none" stroke="${colour}" stroke-width="1.6"
+       stroke-opacity=".85" vector-effect="non-scaling-stroke"/>` +
+    `<circle cx="${x(here).toFixed(1)}" cy="${y(series[here]).toFixed(1)}" r="3"
+       fill="${colour}"/>`;
+
+  const note = document.getElementById(`note-${ci}-${j}`);
+  note.textContent = (hi - lo < 1e-6)
+    ? `model score flat at ${(lo * 100).toFixed(1)}% across this range`
+    : `model score ${(series[0] * 100).toFixed(1)}% → ${(series[n - 1] * 100).toFixed(1)}% `
+      + `across this range (now ${(series[here] * 100).toFixed(1)}%)`;
+  note.style.color = colour;
+}
+
 function onSlide(ci, j, pos) {
   const s = CASES[ci].sliders[j];
   const value = s.values[parseInt(pos, 10)];
   document.getElementById(`out-${ci}-${j}`).textContent =
     value.toFixed(Math.abs(value) < 10 ? 1 : 0) + " " + s.unit;
   recompute(ci);
+  CASES[ci].sliders.forEach((_, k) => drawSpark(ci, k));
 }
 
 function resetCase(ci) {
@@ -339,6 +387,10 @@ function resetCase(ci) {
     onSlide(ci, j, s.baseIndex);
   });
 }
+
+window.addEventListener("DOMContentLoaded", () => {
+  CASES.forEach((c, ci) => c.sliders.forEach((_, j) => drawSpark(ci, j)));
+});
 
 document.addEventListener("wheel", e => {
   if (e.target instanceof HTMLInputElement && e.target.type === "range") e.target.blur();
@@ -354,8 +406,10 @@ def render(cases, footer, amber, red) -> str:
     from demo_data import DISCLAIMER
 
     disclaimer = DISCLAIMER.replace("**", "")
+
+    default = next((i for i, c in enumerate(cases) if c["id"] == DEFAULT_CASE_ID), 0)
     buttons = "".join(
-        f'<button class="case-btn{" active" if i == 0 else ""}" '
+        f'<button class="case-btn{" active" if i == default else ""}" '
         f'onclick="showCase({i})"><b>{html.escape(c["id"])}</b>'
         f'<span>{html.escape(c["summary"])}</span></button>'
         for i, c in enumerate(cases)
@@ -388,12 +442,14 @@ def render(cases, footer, amber, red) -> str:
     <output id="out-{i}-{j}">{s['actual']:g} {html.escape(s['unit'])}</output></label>
   <input type="range" id="in-{i}-{j}" min="0" max="{SWEEP_STEPS - 1}" step="1"
          value="{s['baseIndex']}" oninput="onSlide({i},{j},this.value)">
+  <svg class="spark" id="spark-{i}-{j}" viewBox="0 0 200 26" preserveAspectRatio="none"></svg>
+  <p class="spark-note" id="note-{i}-{j}"></p>
 </div>"""
             for j, s in enumerate(c["sliders"])
         )
 
         panels.append(f"""
-<section class="case" id="case-{i}" {'' if i == 0 else 'hidden'}>
+<section class="case" id="case-{i}" {'' if i == default else 'hidden'}>
   <div class="grid">
     <div class="col">
       <h3>Chest radiograph</h3>
@@ -412,10 +468,11 @@ def render(cases, footer, amber, red) -> str:
       score shown is exact model output rather than an estimate. Sliders snap to the
       precomputed values.</p>
       <p class="muted">The calibrated percentage moves in visible steps, and some
-      sliders will not move it at all. That is the isotonic calibrator, which was
-      fitted on 205 validation points and so maps a range of model scores onto each
-      output level. The uncalibrated score underneath changes continuously — watch
-      that one to see a slider taking effect.</p>
+      sliders will not move it at all. That is the isotonic calibrator: fitted on 205
+      validation points, it maps a range of model scores onto each of nine output
+      levels. The trace under each slider shows the model score across that slider's
+      whole range with your current position marked, so the direction of effect is
+      visible even when the headline percentage has not crossed a step.</p>
       {slider_rows}
       <button class="reset" onclick="resetCase({i})">Reset to this case's values</button>
     </div>
@@ -502,6 +559,8 @@ figcaption {{ color:var(--muted); font-size:.76rem; margin-top:.3rem; text-align
   color:var(--muted); margin-bottom:.15rem; }}
 .slider-row output {{ font-variant-numeric:tabular-nums; color:var(--fg); font-weight:600; }}
 .slider-row input {{ width:100%; accent-color:#2b6cb0; }}
+.spark {{ width:100%; height:26px; display:block; margin-top:-2px; overflow:visible; }}
+.spark-note {{ font-size:.72rem; opacity:.85; margin:.1rem 0 .3rem; }}
 .reset {{ margin-top:.6rem; padding:.35rem .7rem; font:inherit; font-size:.8rem;
   border:1px solid var(--line); background:var(--card); color:inherit; border-radius:5px;
   cursor:pointer; }}
