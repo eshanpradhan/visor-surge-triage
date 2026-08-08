@@ -1,17 +1,26 @@
-# Pinned to the versions this pipeline was developed and validated against.
+# Versions this pipeline was developed and validated against.
+#
+# runtime.txt pins Python 3.11. Every package below publishes a Linux wheel for
+# 3.11, so nothing should build from source; on 3.14 several have no wheels yet
+# and pip falls back to compiling, which is what failed.
+#
+# torch, torchvision and lightgbm stay exactly pinned: those produce the model
+# numbers, and the fp16 checkpoint was verified numerically against these
+# specific builds. numpy and pillow are floors rather than exact pins, to give
+# the resolver room to satisfy whatever torch asks for.
 #
 # Note on LightGBM and PyTorch: both bundle an OpenMP runtime, and on macOS any
 # LightGBM call from a process that has imported torch segfaults. The app scores
 # the clinical model in a subprocess (clinical_service.py) rather than pinning
 # around the problem. See README.md.
 
-numpy==2.1.3
+numpy>=2.1.3
+pillow>=11.1.0
 pandas==2.2.3
 scikit-learn==1.6.1
 scipy==1.15.3
 lightgbm==4.7.0
 torch==2.12.0
 torchvision==0.27.0
-pillow==11.1.0
 matplotlib==3.10.0
 streamlit==1.45.1
