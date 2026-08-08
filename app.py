@@ -96,7 +96,12 @@ def load_everything():
     n_clinical = test_clinical.shape[1]
 
     model = FM.FusionModel(n_clinical, FM.MODALITY_DROPOUT_P, use_image=True)
-    state = torch.load(MODELS / "fusion_no_calendar.pt", map_location="cpu")
+    # the checkpoint is stored in fp16 to halve its size; the forward pass runs in
+    # fp32, so cast on load rather than relying on load_state_dict to convert
+    state = {
+        key: value.float()
+        for key, value in torch.load(MODELS / "fusion_no_calendar.pt", map_location="cpu").items()
+    }
     missing, unexpected = model.load_state_dict(state, strict=False)
     assert not unexpected, f"unexpected keys in checkpoint: {unexpected[:3]}"
     model.eval().to(device)

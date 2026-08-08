@@ -1,5 +1,9 @@
 """Check whether storing the fusion checkpoint in fp16 changes anything measurable.
 
+HISTORICAL: the committed checkpoint is now fp16, so re-running this compares
+fp16 against itself and reports no difference. It is kept as the record of the
+comparison that justified the switch, and of the one metric that did move.
+
 The checkpoint is 60.5 MB in fp32, above GitHub's 50 MB warning threshold. Half
 precision would halve it, but only if the rounding is invisible in the outputs.
 

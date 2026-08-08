@@ -6,7 +6,10 @@
     "best_epoch": 3,
     "modality_dropout": 0.2,
     "excluded_feature": "visit_start_datetime",
-    "seed": 42
+    "seed": 42,
+    "dtype": "float16 (cast to float32 on load)",
+    "size_mb": 30.3,
+    "fp16_note": "Stored half-precision to halve clone/deploy footprint. Demo-case probabilities and tiers identical to fp32; val/test AUPRC and Brier unchanged to 3 dp; val AUROC 0.796 -> 0.795 via one tie flip. Max per-patient probability change 9.2e-05."
   },
   "calibrator": {
     "file": "calibrator_isotonic.json",

@@ -106,11 +106,18 @@ See `models/MODEL_CARD.json` for provenance of each file.
 
 | file | what |
 |---|---|
-| `fusion_no_calendar.pt` | 68 trained tensors. ResNet-50 below `layer4` is frozen at ImageNet init and **not** saved — torchvision fetches it |
+| `fusion_no_calendar.pt` | 68 trained tensors, **fp16** (30.3 MB), cast to fp32 on load. ResNet-50 below `layer4` is frozen at ImageNet init and **not** saved — torchvision fetches it |
 | `calibrator_isotonic.json` | Isotonic calibrator; applies **only** to the checkpoint above |
 | `clinical_lightgbm_{naive,calendar_ablated}.txt` | LightGBM boosters |
 | `encoder_state.json` | Fitted `ClinicalEncoder`: vocabularies, log1p selection, standardization |
 | `impute_stats_final.json` | Train medians/modes, calendar column dropped |
+
+**Half precision.** The checkpoint is stored fp16 to halve its size for cloning
+and deployment; the forward pass still runs in fp32. Verified: all three demo
+cases produce identical probabilities and identical tiers, and val/test AUPRC and
+Brier are unchanged to 3 dp. One metric moves — val AUROC 0.796 → 0.795 — through
+a single tie flip, with no patient's predicted probability shifting by more than
+1e-4. `verify_fp16.py` records that comparison.
 
 **These are fit on the train split (n=955), not train+val (n=1160).** That is
 deliberate: the isotonic calibrator must be fitted on predictions the model made
