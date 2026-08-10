@@ -1,0 +1,40 @@
+# Keep the build context small and free of patient data.
+#
+# The same rule as .gitignore applies here and matters more: COPY . . would
+# otherwise pull the 2.1 GB imaging archive and the per-patient CSVs into an
+# image that gets published. A Space clone will not contain them, but a local
+# `docker build` from this working tree would.
+
+# imaging archive and source clinical data
+COVID-19-NY-SBU/
+covid-19-cxr-ny-sbu.zip
+deidentified_overlap_tcia.csv*
+patient_details.csv
+metadata.csv
+MIDRC-RICORD-*.xlsx
+midrc-ricord-*.zip
+
+# derived per-patient tables and saved arrays
+visor_labels.csv
+visor_cohort.csv
+visor_manifest.csv
+visor_manifest_split.csv
+*.npz
+
+# credentials
+kaggle.json
+.kaggle/
+
+# not needed at runtime
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+.claude/
+demo.html
+
+# top-level result plots only -- demo_assets/*.png ARE required at runtime
+calibration_*.png

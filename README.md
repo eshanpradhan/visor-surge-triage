@@ -1,3 +1,15 @@
+---
+title: VISOR — Surge Triage Demo
+emoji: 🫁
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+short_description: Chest X-ray + clinical fusion model for critical-care escalation
+---
+
 # VISOR — chest X-ray severity prediction (COVID-19-NY-SBU)
 
 Predicting critical-care escalation from a single admission chest radiograph plus
@@ -104,6 +116,48 @@ Demo mode needs no training data: the encoder is restored from
 `clinical_service.py` exists because LightGBM cannot be called from a process
 that has imported torch (see the environment note below); the app sends it an
 encoded feature matrix and gets scores back, which keeps it working in both modes.
+
+### Deploying to Hugging Face Spaces
+
+The Space uses the **Docker SDK**, not the Streamlit SDK, so the Python version
+and the wheel index are pinned in `Dockerfile` rather than auto-detected. An
+earlier attempt failed exactly there: the platform picked Python 3.14, where
+several dependencies have no wheels, and pip fell back to compiling from source.
+
+```bash
+git remote add space https://huggingface.co/spaces/<user>/visor-surge-triage
+git push space main
+```
+
+The Space builds from `Dockerfile` and serves on port 7860, declared in the
+`app_port` field of this file's YAML frontmatter. That frontmatter is what makes
+the repo a valid Space; GitHub renders it as a small table above the README and
+is otherwise unaffected.
+
+Four things the Dockerfile handles that a default build does not:
+
+- **`python:3.11-slim`**, so the version is stated rather than inferred.
+- **`libgomp1` via apt.** LightGBM's wheels are `py3-none-manylinux` and do not
+  vendor OpenMP, so `import lightgbm` fails on a slim image without it.
+- **torch from the CPU wheel index.** The default PyPI wheels bundle CUDA and run
+  to several GB; a Space has no GPU. `torch==2.12.0` is satisfied by
+  `2.12.0+cpu` under PEP 440, so the pinned, validated versions are unchanged.
+- **The ImageNet backbone is baked into the image.** The checkpoint holds only the
+  68 trained tensors, so torchvision would otherwise fetch ~98 MB on first use.
+  A free Space sleeps when idle and re-downloads on every wake, not just the
+  first boot, so this is a cold-start cost on each visit rather than a one-off.
+
+The build also runs the demo cases through the encoder as a smoke test, so a
+missing artifact fails the build instead of the first request.
+
+`.dockerignore` keeps the imaging archive and every per-patient file out of the
+build context. A Space clone will not contain them, but a local `docker build`
+from a working tree that does would otherwise copy 2.1 GB of patient data into a
+published image.
+
+The Space runs in demo mode: it has the committed artifacts but not the cohort
+files, and `VISOR_DEMO_MODE=1` is set explicitly so that is declared rather than
+inferred from a missing path.
 
 ### Saved models (`models/`, committed)
 
