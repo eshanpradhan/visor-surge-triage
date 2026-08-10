@@ -43,6 +43,12 @@ ROOT = Path(__file__).resolve().parent
 MODELS = ROOT / "models"
 CALENDAR_COLUMN = "visit_start_datetime"
 
+# Which synthetic case demo mode lands on, matching demo.html. DEMO-A's score sits
+# deep inside the bottom bin of the isotonic calibrator, so a first click often
+# leaves the badge unmoved and the app looks broken; all five of DEMO-C's sliders
+# shift it. Real mode is unaffected -- it still picks a seeded 3-severe/2-mild mix.
+DEFAULT_DEMO_CASE_ID = "DEMO-C"
+
 # calibrated-probability tiers. Cohort base rate is 20%, so amber starts below it
 TIER_AMBER = 0.10
 TIER_RED = 0.35
@@ -381,7 +387,11 @@ def main() -> None:
             else "Held-out test split. Ground truth shown after scoring."
         )
         if "selected" not in st.session_state:
-            st.session_state.selected = demo_indices[0]
+            st.session_state.selected = next(
+                (i for i in demo_indices
+                 if demo_mode and frame.loc[i, "patient_id"] == DEFAULT_DEMO_CASE_ID),
+                demo_indices[0],
+            )
         for index in demo_indices:
             row = frame.loc[index]
             if demo_mode:
@@ -440,7 +450,7 @@ def main() -> None:
         )
 
         st.markdown(
-            f"**Clinical-only model (LightGBM): {clinical_probability:.0%}**  \n"
+            f"**Clinical-only model (LightGBM): {clinical_probability:.1%}**  \n"
             f"<span style='color:#666;font-size:.85rem'>Uncalibrated. The gap against the "
             f"fusion score is what the radiograph contributes for this patient.</span>",
             unsafe_allow_html=True,
