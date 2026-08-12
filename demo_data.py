@@ -116,6 +116,36 @@ DEMO_PATIENTS = [
     },
 ]
 
+# Clinically plausible sweep ranges, chosen to span what an admitting clinician
+# might actually see rather than the full numeric range of the training data.
+# A feature without an entry here is not offered as a slider.
+SWEEP_RANGES = {
+    "59408-5_Oxygen saturation in Arterial blood by Pulse oximetry": (80, 100, "%", "SpO₂"),
+    "9279-1_Respiratory rate": (12, 40, "/min", "Respiratory rate"),
+    "76282-3_Heart rate.beat-to-beat by EKG": (50, 140, "bpm", "Heart rate"),
+    "8331-1_Oral temperature": (35.5, 40.0, "°C", "Temperature"),
+    "8480-6_Systolic blood pressure": (80, 180, "mmHg", "Systolic BP"),
+    "1988-5_C reactive protein [Mass/volume] in Serum or Plasma": (0.1, 40, "mg/dL", "CRP"),
+    "731-0_Lymphocytes [#/volume] in Blood by Automated count": (0.1, 3.0, "K/µL", "Lymphocytes"),
+    "48058-2_Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma by Immunoassay":
+        (200, 6000, "ng/mL", "D-dimer"),
+    "2524-7_Lactate [Moles/volume] in Serum or Plasma": (0.5, 6.0, "mmol/L", "Lactate"),
+    "75241-0_Procalcitonin [Mass/volume] in Serum or Plasma by Immunoassay":
+        (0.02, 5.0, "ng/mL", "Procalcitonin"),
+    "2276-4_Ferritin [Mass/volume] in Serum or Plasma": (50, 3000, "ng/mL", "Ferritin"),
+    "1920-8_Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma":
+        (10, 400, "U/L", "AST"),
+    "2160-0_Creatinine [Mass/volume] in Serum or Plasma": (0.4, 4.0, "mg/dL", "Creatinine"),
+    "39156-5_Body mass index (BMI) [Ratio]": (18, 45, "kg/m²", "BMI"),
+    "days_prior_sx": (0, 21, "days", "Days of symptoms"),
+}
+
+# How many slider features and how many positions each. The static export
+# precomputes a 7^5 joint grid from these; the live app uses the same ranges but
+# calls the model directly, so the step count only controls slider granularity.
+SWEEP_FEATURES = 5
+SWEEP_STEPS = 7
+
 DISCLAIMER = (
     "**Demonstration mode — synthetic data.** These are not real patients. The "
     "radiographs are public NIH ChestX-ray14 samples unrelated to the training cohort, "

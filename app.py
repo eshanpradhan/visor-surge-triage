@@ -228,15 +228,96 @@ def tier_for(probability: float) -> tuple[str, str]:
     return "LOW", "#1e8449"
 
 
+
+# --------------------------------------------------------------------------
+# live what-if sliders (demo mode only)
+# --------------------------------------------------------------------------
+
+@st.cache_resource(show_spinner=False)
+def image_representation(_artifacts, row_index: int):
+    """The fusion model's projected image vector for one case.
+
+    Constant while the sliders move -- only clinical values change -- so it is
+    computed once per case. The two branches are independent until they are
+    concatenated and modality dropout is inactive in eval, so reusing it is exact
+    rather than an approximation; assert_matches_full_forward checks that.
+    """
+    import torch
+
+    FM = _artifacts["FM"]
+    model = _artifacts["model"]
+    frame = _artifacts["test_frame"].iloc[[row_index]]
+    clinical = _artifacts["test_clinical"][[row_index]]
+    loader = FM.make_loader(frame, clinical, False, {}, False, True)
+    images, _clinical_tensor, _label = next(iter(loader))
+    with torch.no_grad():
+        return model.image_projection(model.backbone(images.to(_artifacts["device"])))
+
+
+def score_rows(artifacts, image_repr, rows: pd.DataFrame):
+    """Fusion logits for a batch of clinical rows, image held fixed."""
+    import torch
+
+    model = artifacts["model"]
+    encoded = artifacts["encoder"].transform(rows).astype(np.float32)
+    with torch.no_grad():
+        clinical = model.clinical_branch(torch.from_numpy(encoded))
+        joint = torch.cat([image_repr.expand(len(encoded), -1), clinical], dim=1)
+        return model.head(joint).squeeze(1).numpy(), encoded
+
+
+def slider_columns(artifacts, attribution) -> list[str]:
+    """Highest-attribution numeric features that have a defined clinical range."""
+    from demo_data import SWEEP_FEATURES, SWEEP_RANGES
+
+    ranked = sorted(zip(artifacts["feature_names"], np.abs(attribution)), key=lambda p: -p[1])
+    columns, seen = [], set()
+    for name, _ in ranked:
+        column = name.replace("__log1p", "")
+        if column in seen or column not in SWEEP_RANGES:
+            continue
+        seen.add(column)
+        columns.append(column)
+        if len(columns) == SWEEP_FEATURES:
+            break
+    return columns
+
+
+def sparkline(series, position: int, rising: bool) -> str:
+    """Inline SVG trace of the model score across one slider's range."""
+    low, high = min(series), max(series)
+    span = (high - low) or 1.0
+    colour = "#c0392b" if rising else "#1e8449"
+    points = " ".join(
+        f"{4 + i * (192 / (len(series) - 1)):.1f},"
+        f"{13 if high - low < 1e-6 else 22 - ((v - low) / span) * 18:.1f}"
+        for i, v in enumerate(series)
+    )
+    x = 4 + position * (192 / (len(series) - 1))
+    y = 13 if high - low < 1e-6 else 22 - ((series[position] - low) / span) * 18
+    return (
+        f'<svg viewBox="0 0 200 26" preserveAspectRatio="none" '
+        f'style="width:100%;height:26px;overflow:visible">'
+        f'<polyline points="{points}" fill="none" stroke="{colour}" stroke-width="1.6" '
+        f'stroke-opacity=".85" vector-effect="non-scaling-stroke"/>'
+        f'<circle cx="{x:.1f}" cy="{y:.1f}" r="3" fill="{colour}"/></svg>'
+    )
+
+
 # --------------------------------------------------------------------------
 # inference + explanations
 # --------------------------------------------------------------------------
 
-def fusion_score_and_cam(artifacts, row_index: int):
+def fusion_score_and_cam(artifacts, row_index: int, clinical_override=None):
     """Return (logit, grad-CAM HxW in 0-1, clinical gradient x input attributions).
 
     Both explanations come from the same backward pass, and both describe the
     fusion model that produced the displayed score.
+
+    ``clinical_override`` is an encoded feature vector replacing the case's own.
+    Demo mode passes the slider-modified values, so the heat map and the driver
+    chart describe the score actually on screen. Without it the image explanation
+    would silently keep describing the unmodified case.
     """
     import torch
 
@@ -246,6 +327,8 @@ def fusion_score_and_cam(artifacts, row_index: int):
 
     frame = artifacts["test_frame"].iloc[[row_index]]
     clinical = artifacts["test_clinical"][[row_index]]
+    if clinical_override is not None:
+        clinical = np.asarray(clinical_override, dtype=np.float32).reshape(1, -1)
     loader = FM.make_loader(frame, clinical, False, {}, False, True)
     images, clinical_tensor, _label = next(iter(loader))
     images = images.to(device)
@@ -344,6 +427,87 @@ def pick_demo_patients(_frame: pd.DataFrame, demo_mode: bool,
     return [int(i) for i in chosen]
 
 
+def render_sliders(artifacts, index: int, row, attribution):
+    """Draw the what-if sliders and return (modified row, per-slider traces).
+
+    Every slider position is scored by calling the model, not by looking anything
+    up: this build has a backend, so the static export's precomputed grid is
+    unnecessary. Each trace is seven live forward passes through the clinical
+    branch with the other sliders held where the viewer left them, batched into a
+    single call.
+    """
+    from demo_data import SWEEP_RANGES, SWEEP_STEPS
+
+    columns = slider_columns(artifacts, attribution)
+    image_repr = image_representation(artifacts, index)
+
+    st.markdown("#### Explore how each factor affects this case")
+    st.caption(
+        "Live inference — each move re-runs the fusion model and the LightGBM "
+        "comparison on the new values. Nothing here is precomputed or interpolated."
+    )
+    st.caption(
+        "The calibrated percentage moves in steps and some changes will not shift it "
+        "at all: the isotonic calibrator was fitted on 205 validation points and maps "
+        "a range of model scores onto each of nine output levels. The trace under each "
+        "slider is the uncalibrated score across that slider's range, so the direction "
+        "of effect stays visible."
+    )
+
+    modified = row.copy()
+    chosen = {}
+    for column in columns:
+        low, high, unit, label = SWEEP_RANGES[column]
+        step = (high - low) / (SWEEP_STEPS - 1)
+        value = st.slider(
+            f"{label} ({unit})",
+            min_value=float(low),
+            max_value=float(high),
+            value=float(np.clip(row[column], low, high)),
+            step=float(step),
+            key=f"slider-{index}-{column}",
+        )
+        chosen[column] = value
+        modified[column] = value
+
+    if st.button("Reset to this case's values", key=f"reset-{index}"):
+        for column in columns:
+            st.session_state.pop(f"slider-{index}-{column}", None)
+        st.rerun()
+
+    # one batched call covers every trace: 5 sliders x 7 positions
+    traces, batch = [], []
+    for column in columns:
+        low, high, _unit, _label = SWEEP_RANGES[column]
+        for value in np.linspace(low, high, SWEEP_STEPS):
+            candidate = modified.copy()
+            candidate[column] = float(value)
+            batch.append(candidate)
+    logits, _ = score_rows(artifacts, image_repr, pd.DataFrame(batch))
+    raw = 1.0 / (1.0 + np.exp(-logits))
+
+    for position, column in enumerate(columns):
+        low, high, unit, label = SWEEP_RANGES[column]
+        series = raw[position * SWEEP_STEPS:(position + 1) * SWEEP_STEPS].tolist()
+        axis = np.linspace(low, high, SWEEP_STEPS)
+        here = int(np.abs(axis - chosen[column]).argmin())
+        rising = series[-1] >= series[0]
+        st.markdown(sparkline(series, here, rising), unsafe_allow_html=True)
+        colour = "#c0392b" if rising else "#1e8449"
+        st.markdown(
+            f"<div style='font-size:.72rem;color:{colour};margin:-6px 0 10px'>"
+            f"{label}: model score {series[0] * 100:.1f}% → {series[-1] * 100:.1f}% "
+            f"across this range (now {series[here] * 100:.1f}%)</div>",
+            unsafe_allow_html=True,
+        )
+        traces.append((label, series))
+
+    changed = any(
+        not np.isclose(float(chosen[c]), float(row[c]), rtol=0, atol=1e-9) for c in columns
+    )
+    return (modified if changed else row), traces
+
+
 def main() -> None:
     st.title("VISOR — surge triage demo")
     st.caption(
@@ -409,33 +573,72 @@ def main() -> None:
     index = st.session_state.selected
     row = frame.loc[index]
 
-    rows = tuple(tuple(float(v) for v in artifacts["test_clinical"][i]) for i in demo_indices)
-    clinical_scores = load_clinical_scores("demo" if demo_mode else "test", rows)
-    position = demo_indices.index(index)
-
+    # Ranking which features get sliders needs an attribution, which needs a score,
+    # so the case is scored once at its own values first. That pass also supplies
+    # the baseline the delta is measured against.
     with st.spinner("Scoring…"):
-        logit, cam, clinical_attribution = fusion_score_and_cam(artifacts, index)
-        probability = apply_calibrator(logit, artifacts["calibrator"])
-        base_image, blended = overlay_cam(row["filepath"], cam)
+        base_logit, _cam, base_attribution = fusion_score_and_cam(artifacts, index)
+        baseline_probability = apply_calibrator(base_logit, artifacts["calibrator"])
 
-    clinical_probability = clinical_scores["probabilities"][position]
+    left, right = st.columns([1, 1])
+
+    # The sliders live in the left column but their values are needed by the right,
+    # so the left column is written first and the score computed in between.
+    slider_row = row
+    with left:
+        st.subheader("Chest radiograph")
+        image_slot = st.container()
+        if demo_mode:
+            slider_row, _traces = render_sliders(artifacts, index, row, base_attribution)
+
+    moved = slider_row is not row
+    if moved:
+        image_repr = image_representation(artifacts, index)
+        _logits, encoded = score_rows(artifacts, image_repr, slider_row.to_frame().T)
+        live_features = tuple(float(v) for v in encoded[0])
+        # Recomputed against the modified values so the driver chart describes the
+        # score on screen.
+        #
+        # The heat map comes back byte-identical every time, and that is a property of
+        # the architecture rather than a shortcut: the joint head is linear over the
+        # concatenated branches, so d(logit)/d(image activations) contains no clinical
+        # term and there is no gradient path from the clinical features into the image
+        # branch. Grad-CAM therefore reflects the radiograph alone. The backward pass
+        # is needed for the attribution regardless, so taking the map from the same
+        # call costs nothing.
+        logit, cam, clinical_attribution = fusion_score_and_cam(
+            artifacts, index, clinical_override=encoded[0]
+        )
+    else:
+        live_features = tuple(float(v) for v in artifacts["test_clinical"][index])
+        logit, cam, clinical_attribution = base_logit, _cam, base_attribution
+
+    probability = apply_calibrator(logit, artifacts["calibrator"])
+    base_image, blended = overlay_cam(row["filepath"], cam)
+
+    clinical_scores = load_clinical_scores(
+        f"{'demo' if demo_mode else 'test'}-{index}", (live_features,)
+    )
+    clinical_probability = clinical_scores["probabilities"][0]
     fusion_top = top_contributions(artifacts["feature_names"], clinical_attribution)
     reference_top = top_contributions(
-        artifacts["feature_names"], clinical_scores["contributions"][position]
+        artifacts["feature_names"], clinical_scores["contributions"][0]
     )
 
     tier, colour = tier_for(probability)
 
-    left, right = st.columns([1, 1])
-
-    with left:
-        st.subheader("Chest radiograph")
+    # image_slot was reserved in the left column before the sliders were drawn, so
+    # the radiograph appears above them despite being rendered after
+    with image_slot:
         image_col, cam_col = st.columns(2)
         image_col.image(base_image, caption="Admission film", use_container_width=True)
         cam_col.image(blended, caption="Grad-CAM (fusion model)", use_container_width=True)
         st.caption(
-            "Grad-CAM is computed on the fusion model being scored, so it reflects "
-            "this prediction."
+            "**Grad-CAM reflects the X-ray only** — clinical inputs don't influence "
+            "which image regions the model attends to, since the two branches combine "
+            "linearly. Moving a slider changes the score and the clinical driver chart, "
+            "but the heat map is fixed for a given radiograph: there is no gradient path "
+            "from the clinical features back into the image branch."
         )
 
     with right:

@@ -48,8 +48,6 @@ os.environ["VISOR_DEMO_MODE"] = "1"
 ROOT = Path(__file__).resolve().parent
 OUT_HTML = ROOT / "demo.html"
 TOP_N = 8
-SWEEP_FEATURES = 5
-SWEEP_STEPS = 7
 
 # Which case is selected on page load. DEMO-A's raw score sits deep inside the
 # bottom bin of the isotonic calibrator, so single-slider moves rarely cross a bin
@@ -63,31 +61,6 @@ SNAPSHOT_NOTE = (
     "purposes — see the GitHub repo for the full interactive version and source code."
 )
 REPO_URL = "https://github.com/eshanpradhan/visor-surge-triage"
-
-# Clinically plausible sweep ranges, chosen to span what an admitting clinician
-# might actually see rather than the full numeric range of the training data.
-# A feature without an entry here is not offered as a slider.
-SWEEP_RANGES = {
-    "59408-5_Oxygen saturation in Arterial blood by Pulse oximetry": (80, 100, "%", "SpO₂"),
-    "9279-1_Respiratory rate": (12, 40, "/min", "Respiratory rate"),
-    "76282-3_Heart rate.beat-to-beat by EKG": (50, 140, "bpm", "Heart rate"),
-    "8331-1_Oral temperature": (35.5, 40.0, "°C", "Temperature"),
-    "8480-6_Systolic blood pressure": (80, 180, "mmHg", "Systolic BP"),
-    "1988-5_C reactive protein [Mass/volume] in Serum or Plasma": (0.1, 40, "mg/dL", "CRP"),
-    "731-0_Lymphocytes [#/volume] in Blood by Automated count": (0.1, 3.0, "K/µL", "Lymphocytes"),
-    "48058-2_Fibrin D-dimer DDU [Mass/volume] in Platelet poor plasma by Immunoassay":
-        (200, 6000, "ng/mL", "D-dimer"),
-    "2524-7_Lactate [Moles/volume] in Serum or Plasma": (0.5, 6.0, "mmol/L", "Lactate"),
-    "75241-0_Procalcitonin [Mass/volume] in Serum or Plasma by Immunoassay":
-        (0.02, 5.0, "ng/mL", "Procalcitonin"),
-    "2276-4_Ferritin [Mass/volume] in Serum or Plasma": (50, 3000, "ng/mL", "Ferritin"),
-    "1920-8_Aspartate aminotransferase [Enzymatic activity/volume] in Serum or Plasma":
-        (10, 400, "U/L", "AST"),
-    "2160-0_Creatinine [Mass/volume] in Serum or Plasma": (0.4, 4.0, "mg/dL", "Creatinine"),
-    "39156-5_Body mass index (BMI) [Ratio]": (18, 45, "kg/m²", "BMI"),
-    "days_prior_sx": (0, 21, "days", "Days of symptoms"),
-}
-
 
 def png_data_uri(image) -> str:
     buffer = io.BytesIO()
@@ -180,7 +153,7 @@ def build_cases():
     from PIL import Image
 
     import app
-    from demo_data import DEMO_PATIENTS
+    from demo_data import DEMO_PATIENTS, SWEEP_FEATURES, SWEEP_RANGES, SWEEP_STEPS
 
     artifacts = app.load_everything()
     assert artifacts["demo_mode"], "expected demo mode; refusing to snapshot real patients"
