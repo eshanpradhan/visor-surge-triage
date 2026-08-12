@@ -1,0 +1,45 @@
+# What `gcloud run deploy --source .` uploads to Cloud Build.
+#
+# This exists for the same reason as .dockerignore, but the stakes are higher:
+# .dockerignore controls what enters a local image, while this controls what
+# leaves the machine. Without it, `--source .` would upload the 2.1 GB imaging
+# archive and every per-patient CSV to Google Cloud Storage.
+#
+# gcloud will synthesize a .gcloudignore from .gitignore when this file is
+# absent. That would happen to cover the patient data, but relying on an
+# inferred file for that is not a good way to decide what gets uploaded to a
+# third party -- so it is written out explicitly.
+#
+# Keep in sync with .dockerignore.
+
+# imaging archive and source clinical data
+COVID-19-NY-SBU/
+covid-19-cxr-ny-sbu.zip
+deidentified_overlap_tcia.csv*
+patient_details.csv
+metadata.csv
+MIDRC-RICORD-*.xlsx
+midrc-ricord-*.zip
+
+# derived per-patient tables and saved arrays
+visor_labels.csv
+visor_cohort.csv
+visor_manifest.csv
+visor_manifest_split.csv
+*.npz
+
+# credentials
+kaggle.json
+.kaggle/
+
+# not needed to build or run
+.git/
+.gitignore
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+.DS_Store
+.claude/
+demo.html
+calibration_*.png
