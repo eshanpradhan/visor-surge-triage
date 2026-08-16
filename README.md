@@ -1,15 +1,3 @@
----
-title: VISOR — Surge Triage Demo
-emoji: 🫁
-colorFrom: blue
-colorTo: gray
-sdk: docker
-app_port: 7860
-pinned: false
-license: mit
-short_description: Chest X-ray + clinical fusion model for critical-care escalation
----
-
 # VISOR — chest X-ray severity prediction (COVID-19-NY-SBU)
 
 **Live demo: https://visor-surge-triage-767467039594.us-central1.run.app**
@@ -145,22 +133,40 @@ The service runs in demo mode because the cohort files are not deployed, and
 `--allow-unauthenticated` makes it publicly reachable, which is intended for a
 demo carrying no patient data. A $5 budget alert is set on the project.
 
-### Deploying to Hugging Face Spaces
+### Deploying to Hugging Face Spaces (alternative, no billing required)
 
-The Space uses the **Docker SDK**, not the Streamlit SDK, so the Python version
-and the wheel index are pinned in `Dockerfile` rather than auto-detected. An
-earlier attempt failed exactly there: the platform picked Python 3.14, where
-several dependencies have no wheels, and pip fell back to compiling from source.
+Not the current deployment — kept because it needs no billing account and the
+same `Dockerfile` works unchanged.
+
+A Space is identified by YAML frontmatter at the very top of `README.md`. It is
+not present here, because GitHub renders it as a table above the readme and the
+live deployment does not need it. To publish a Space, prepend:
+
+```yaml
+---
+title: VISOR — Surge Triage Demo
+emoji: 🫁
+colorFrom: blue
+colorTo: gray
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+short_description: Chest X-ray + clinical fusion model for critical-care escalation
+---
+```
+
+then:
 
 ```bash
 git remote add space https://huggingface.co/spaces/<user>/visor-surge-triage
 git push space main
 ```
 
-The Space builds from `Dockerfile` and serves on port 7860, declared in the
-`app_port` field of this file's YAML frontmatter. That frontmatter is what makes
-the repo a valid Space; GitHub renders it as a small table above the README and
-is otherwise unaffected.
+The Space uses the **Docker SDK**, not the Streamlit SDK, so the Python version
+and the wheel index are pinned in `Dockerfile` rather than auto-detected. An
+earlier attempt failed exactly there: the platform picked Python 3.14, where
+several dependencies have no wheels, and pip fell back to compiling from source.
 
 Four things the Dockerfile handles that a default build does not:
 
