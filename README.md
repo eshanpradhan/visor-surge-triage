@@ -12,8 +12,14 @@ short_description: Chest X-ray + clinical fusion model for critical-care escalat
 
 # VISOR — chest X-ray severity prediction (COVID-19-NY-SBU)
 
+**Live demo: https://visor-surge-triage-767467039594.us-central1.run.app**
+
 Predicting critical-care escalation from a single admission chest radiograph plus
 clinical data at presentation.
+
+The live demo runs on synthetic cases with public NIH radiographs — no patient
+data is deployed. Its scores are not clinically meaningful; all reported
+performance below comes from the held-out SBU test split.
 
 **Label.** `severe = is_icu OR was_ventilated` — an escalation/urgency outcome.
 Death is deliberately excluded: 69 of 183 deceased patients were never admitted
@@ -82,6 +88,12 @@ fold- or model-level metrics.
 
 ### Demo
 
+**Deployed:** https://visor-surge-triage-767467039594.us-central1.run.app
+(Cloud Run, us-central1, demo mode). A static, dependency-free snapshot of the
+same output is committed as `demo.html` — open it in any browser, no server.
+
+Run it locally instead:
+
 ```bash
 pip install -r requirements.txt
 streamlit run app.py
@@ -116,6 +128,22 @@ Demo mode needs no training data: the encoder is restored from
 `clinical_service.py` exists because LightGBM cannot be called from a process
 that has imported torch (see the environment note below); the app sends it an
 encoded feature matrix and gets scores back, which keeps it working in both modes.
+
+### Deploying to Cloud Run (what the live URL runs)
+
+```bash
+gcloud run deploy visor-surge-triage --source . \
+  --port 7860 --memory 4Gi --cpu 2 --allow-unauthenticated --region us-central1
+```
+
+Cloud Build builds the same `Dockerfile`. `--cpu 2` matters: a ResNet-50 forward
+plus Grad-CAM on one vCPU makes each interaction sluggish. `.gcloudignore` keeps
+the imaging archive and every per-patient file out of the uploaded source — 32.7
+MB goes up, none of it patient data.
+
+The service runs in demo mode because the cohort files are not deployed, and
+`--allow-unauthenticated` makes it publicly reachable, which is intended for a
+demo carrying no patient data. A $5 budget alert is set on the project.
 
 ### Deploying to Hugging Face Spaces
 
